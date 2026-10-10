@@ -154,15 +154,35 @@ let line=[], tray=[], pick=null, t0=0, taps=0, solved=false;
 const scr=document.getElementById("screen"), tag=document.getElementById("modeTag"), titleEl=document.getElementById("title");
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const first=()=>esc(session.name.split(" ")[0]);
+const first=()=>esc(session.first||session.name.split(" ")[0]);
+/* Older saved sessions only have "name"; split it so their CSV rows still fill both columns. */
+const nameParts=s=>s.first!==undefined?[s.first,s.last]:[(s.name||"").split(" ")[0],(s.name||"").split(" ").slice(1).join(" ")];
 function on(id,f){const e=document.getElementById(id);if(e)e.onclick=f}
 
 /* Backup of finished sessions on this device */
 const KEY="ss-test-sessions";
 function backups(){try{return JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){return[]}}
-function storeBackup(s){try{const b=backups().filter(x=>x.id!==s.id);b.push(s);localStorage.setItem(KEY,JSON.stringify(b))}catch(e){}}
+/* Returns true only if the session can be read back from storage. */
+function storeBackup(s){try{const b=backups().filter(x=>x.id!==s.id);b.push(s);localStorage.setItem(KEY,JSON.stringify(b));return backups().some(x=>x.id===s.id)}catch(e){return false}}
 function clearBackups(){try{localStorage.removeItem(KEY)}catch(e){}}
 
+function getDevice(){try{return localStorage.getItem("ss-device")||""}catch(e){return""}}
+function setDevice(v){try{localStorage.setItem("ss-device",v)}catch(e){}}
+function savedDates(list){const d=[...new Set(list.map(s=>s.date))].sort();return d.length===1?d[0]:d[0]+" to "+d[d.length-1]}
+function saveAll(){
+  const dev=getDevice().replace(/[^A-Za-z0-9]+/g,""), n=backups().length;
+  saveWithStatus(toCSV(backups()),`SentenceSense_${dev?"iPad"+dev+"_":""}${localDate()}.csv`,`all ${n} student${n===1?"":"s"}`);
+}
+/* Runs a save and reports the outcome in #saveMsg. */
+async function saveWithStatus(text,name,what){
+  const el=document.getElementById("saveMsg"), say=(m,c)=>{if(el){el.textContent=m;el.className="feedback "+c}};
+  say("Saving…","try");
+  const r=await download(text,name);
+  if(r==="shared")say(`✓ File for ${what} sent. Check that it shows up in OneDrive or Files.`,"good");
+  else if(r==="downloaded")say(`✓ File for ${what} downloaded (${name}). Check your Downloads folder.`,"good");
+  else if(r==="cancelled")say(`✗ Not saved. The share menu was closed. Tap the button again and pick OneDrive or Save to Files.`,"try");
+  else say(`✗ The file could not be saved. Try again.`,"try");
+}
 function localDate(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
 
 /* ================= SETUP ================= */
@@ -172,7 +192,10 @@ function setup(){
   scr.innerHTML=`<section class="card">
     <h2>Student information</h2>
     <div class="row">
-      <div class="field"><label for="name">Student name</label><input id="name" autocomplete="off"></div>
+      <div class="field"><label for="fname">First name</label><input id="fname" autocomplete="off" autocapitalize="words"></div>
+      <div class="field"><label for="lname">Last name</label><input id="lname" autocomplete="off" autocapitalize="words"></div>
+    </div>
+    <div class="row">
       <div class="field"><label for="dob">Date of birth</label><input id="dob" type="date" max="${today}"></div>
     </div>
     <div class="field"><label>Tasks to give</label>
@@ -183,26 +206,35 @@ function setup(){
     </div>
     <p class="note">Each part starts with 2 practice items. Sentence Builder has 20 test items and Pronoun Detective has 14.</p>
     <div class="actions"><button class="btn primary" id="begin" disabled>Start</button></div>
-    <div class="examiner">
-      <span>${saved.length} finished session${saved.length===1?"":"s"} saved on this device.</span>
-      <button class="btn small" id="dlAll" ${saved.length?"":"disabled"}>Save all as one CSV</button>
-      <button class="btn small" id="clr" ${saved.length?"":"disabled"}>Clear saved sessions</button>
+  </section>
+  <section class="card" style="margin-top:18px">
+    <h2>End of the day</h2>
+    <div class="row">
+      <div class="field"><label for="device">iPad number</label><input id="device" autocomplete="off" maxlength="10" value="${esc(getDevice())}" placeholder="e.g. 7"></div>
     </div>
-    <p class="note" id="clrMsg"></p>
+    <p class="note"><strong>${saved.length}</strong> student${saved.length===1?"":"s"} saved on this iPad${saved.length?` (${esc(savedDates(saved))})`:""}. Results are kept automatically after each student.</p>
+    <div class="actions">
+      <button class="btn primary" id="dlAll" ${saved.length?"":"disabled"}>Save all results (CSV)</button>
+      <button class="btn" id="clr" ${saved.length?"":"disabled"}>Clear saved sessions</button>
+    </div>
+    <p class="feedback" id="saveMsg"></p>
+    <p class="note" id="clrMsg">After the file is in OneDrive, tap Clear so tomorrow's file starts fresh.</p>
   </section>`;
-  const nm=$("#name"),db=$("#dob"),go=$("#begin"),c1=$("#doSB"),c2=$("#doPD");
-  const ok=()=>go.disabled=!(nm.value.trim()&&db.value&&(c1.checked||c2.checked));
-  [nm,db].forEach(e=>{e.oninput=ok;e.onchange=ok});c1.onchange=ok;c2.onchange=ok;
+  const fn=$("#fname"),ln=$("#lname"),db=$("#dob"),go=$("#begin"),c1=$("#doSB"),c2=$("#doPD");
+  const ok=()=>go.disabled=!(fn.value.trim()&&ln.value.trim()&&db.value&&(c1.checked||c2.checked));
+  [fn,ln,db].forEach(e=>{e.oninput=ok;e.onchange=ok});c1.onchange=ok;c2.onchange=ok;
   go.onclick=()=>{
     plan=[];if(c1.checked)plan.push("sb");if(c2.checked)plan.push("pd");
-    session={id:Date.now().toString(36),name:nm.value.trim(),dob:db.value,date:today,
+    const f=fn.value.trim(),l=ln.value.trim();
+    session={id:Date.now().toString(36),first:f,last:l,name:f+" "+l,dob:db.value,date:today,device:getDevice(),
       start:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),results:[],status:{}};
     step=0;beginTask();
   };
-  on("dlAll",()=>download(toCSV(backups()),`SentenceSense_AllSessions_${today}.csv`));
+  const dev=$("#device");dev.oninput=()=>setDevice(dev.value.trim());
+  on("dlAll",saveAll);
   let armed=false;
   on("clr",()=>{if(!armed){armed=true;$("#clrMsg").textContent="Press Clear again to delete all saved sessions from this device. Make sure they are saved to OneDrive first.";return}clearBackups();setup()});
-  nm.focus();
+  fn.focus();
 }
 
 /* ================= FLOW ================= */
@@ -328,7 +360,7 @@ function submit(){
 
 /* ================= FINISH ================= */
 function finish(){
-  phase="done";tag.hidden=true;titleEl.textContent="Sentence Tasks";storeBackup(session);
+  phase="done";tag.hidden=true;titleEl.textContent="Sentence Tasks";const kept=storeBackup(session);
   const r=session.results, sum=a=>a.reduce((t,x)=>t+x.correct,0);
   let rows="";
   if(plan.includes("sb")){
@@ -342,7 +374,7 @@ function finish(){
     rows+=`<tr><th colspan="2">Part 2: Pronoun Detective · ${esc(session.status.pd||"")}</th></tr>`;
     rows+=`<tr><td><strong>Pronoun Detective total</strong></td><td><strong>${sum(pd)} / ${pd.length}</strong></td></tr>`;
   }
-  const fname=`SentenceSense_${session.name.replace(/[^A-Za-z0-9]+/g,"_")}_${session.date}.csv`;
+  const fname=`SentenceSense_${(session.last+"_"+session.first).replace(/[^A-Za-z0-9]+/g,"_")}_${session.date}.csv`;
   scr.innerHTML=`<section class="card">
     <div class="big center" aria-hidden="true">★★★★★</div>
     <h2 class="center">All done. Great job, ${first()}!</h2>
@@ -350,23 +382,27 @@ function finish(){
       <strong style="color:var(--ink)">Examiner summary</strong>
       <span>${esc(session.name)} · DOB ${session.dob} · Age ${ageMonths(session.dob,session.date)} months · ${session.date}</span>
       <div class="tablewrap"><table><tbody>${rows}</tbody></table></div>
-      <div class="actions"><button class="btn primary" id="save">Save results (CSV)</button><button class="btn" id="newS">Next student</button></div>
-      <span>On iPad, Save opens the share menu: choose OneDrive or Save to Files. This session is also kept on this device as a short-term backup until you clear it from the start screen.</span>
+      ${kept
+        ?`<p class="feedback good">✓ Results saved on this iPad (${backups().length} student${backups().length===1?"":"s"} saved on this iPad so far). At the end of the day, tap Save all results on the start screen.</p>`
+        :`<p class="feedback try">✗ Results were NOT saved on this iPad (Private Browsing or storage is off). Tap Save this student now before moving on.</p>`}
+      <div class="actions"><button class="btn primary" id="newS">Next student</button>${kept?`<button class="btn" id="saveAll">Save all results now</button>`:""}<button class="btn ${kept?"small":"primary"}" id="save">Save this student${kept?" only":""}</button></div>
+      <p class="feedback" id="saveMsg"></p>
     </div></section>`;
-  on("save",()=>download(toCSV([session]),fname));
+  on("save",()=>saveWithStatus(toCSV([session]),fname,"this student"));
+  on("saveAll",saveAll);
   on("newS",setup);
 }
 function ageMonths(dob,date){const a=new Date(dob),b=new Date(date);if(isNaN(a)||isNaN(b))return"";let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());if(b.getDate()<a.getDate())m--;return m}
 
 /* ================= CSV ================= */
 function toCSV(sessions){
-  const head=["student_name","dob","age_months","test_date","start_time","task","task_status","item","level","level_name","prompt","target","response","response_order","correct","time_sec","taps","task_total_correct"];
+  const head=["first_name","last_name","dob","age_months","test_date","start_time","ipad","task","task_status","item","level","level_name","prompt","target","response","response_order","correct","time_sec","taps","task_total_correct"];
   const q=v=>{v=String(v??"");return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const out=[head.join(",")];
   sessions.forEach(s=>{
     const st=s.status||{}, tot=k=>s.results.filter(x=>(x.task||"sb")===k).reduce((a,x)=>a+x.correct,0);
     s.results.forEach(x=>{const k=x.task||"sb";
-      out.push([s.name,s.dob,ageMonths(s.dob,s.date),s.date,s.start,TASKS[k].csvName,st[k]||s.ended||"",x.item,x.level,x.levelName,x.prompt||"",x.target,x.response,x.responseOrder,x.correct,x.timeSec,x.taps,tot(k)].map(q).join(","))});
+      out.push([...nameParts(s),s.dob,ageMonths(s.dob,s.date),s.date,s.start,s.device||"",TASKS[k].csvName,st[k]||s.ended||"",x.item,x.level,x.levelName,x.prompt||"",x.target,x.response,x.responseOrder,x.correct,x.timeSec,x.taps,tot(k)].map(q).join(","))});
   });
   return "﻿"+out.join("\r\n");
 }
@@ -374,11 +410,14 @@ function toCSV(sessions){
 async function download(text,name){
   try{
     const file=new File([text],name,{type:"text/csv"});
-    if(navigator.maxTouchPoints>1&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}
-  }catch(e){if(e&&e.name==="AbortError")return}
-  const blob=new Blob([text],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
-  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+    if(navigator.maxTouchPoints>1&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return"shared"}
+  }catch(e){if(e&&e.name==="AbortError")return"cancelled"}
+  try{
+    const blob=new Blob([text],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+    return"downloaded";
+  }catch(e){return"failed"}
 }
 function speak(t){try{const s=window.speechSynthesis;if(!s)return;s.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.85;u.lang="en-US";s.speak(u)}catch(e){}}
 
