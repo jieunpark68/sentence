@@ -73,6 +73,12 @@ th{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
 .choice[aria-pressed="true"]{border-color:var(--navy);background:var(--navy);color:#fff}
 .choice.hint{box-shadow:0 0 0 4px var(--sea)}
 .choice:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
+.dob{display:flex;align-items:center;gap:8px}
+.dob input{font-family:var(--read);font-size:22px;width:3.4em;text-align:center;padding:10px 6px;border:2px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)}
+.dob input.yr{width:4.6em}
+.dob input:focus{outline:3px solid var(--sea);outline-offset:1px}
+.dob span{font-size:22px;color:var(--muted)}
+#dobMsg{color:var(--warn);font-weight:700}
 .checks{display:flex;flex-wrap:wrap;gap:10px 20px}
 .checks label{display:flex;align-items:center;gap:8px;font-size:17px;cursor:pointer}
 .checks input{width:22px;height:22px;accent-color:var(--navy)}
@@ -196,7 +202,16 @@ function setup(){
       <div class="field"><label for="lname">Last name</label><input id="lname" autocomplete="off" autocapitalize="words"></div>
     </div>
     <div class="row">
-      <div class="field"><label for="dob">Date of birth</label><input id="dob" type="date" max="${today}"></div>
+      <div class="field"><label for="dobM">Date of birth</label>
+        <div class="dob">
+          <input id="dobM" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Birth month" autocomplete="off">
+          <span>/</span>
+          <input id="dobD" inputmode="numeric" maxlength="2" placeholder="DD" aria-label="Birth day" autocomplete="off">
+          <span>/</span>
+          <input id="dobY" class="yr" inputmode="numeric" maxlength="4" placeholder="YYYY" aria-label="Birth year" autocomplete="off">
+        </div>
+        <span class="note" id="dobMsg"></span>
+      </div>
     </div>
     <div class="field"><label>Tasks to give</label>
       <div class="checks">
@@ -220,13 +235,26 @@ function setup(){
     <p class="feedback" id="saveMsg"></p>
     <p class="note" id="clrMsg">After the file is in OneDrive, tap Clear so tomorrow's file starts fresh.</p>
   </section>`;
-  const fn=$("#fname"),ln=$("#lname"),db=$("#dob"),go=$("#begin"),c1=$("#doSB"),c2=$("#doPD");
-  const ok=()=>go.disabled=!(fn.value.trim()&&ln.value.trim()&&db.value&&(c1.checked||c2.checked));
-  [fn,ln,db].forEach(e=>{e.oninput=ok;e.onchange=ok});c1.onchange=ok;c2.onchange=ok;
+  const fn=$("#fname"),ln=$("#lname"),go=$("#begin"),c1=$("#doSB"),c2=$("#doPD");
+  const dM=$("#dobM"),dD=$("#dobD"),dY=$("#dobY"),dMsg=$("#dobMsg");
+  /* Typed date of birth: returns "YYYY-MM-DD" when valid, "" otherwise, and shows why. */
+  const readDob=()=>{
+    const m=dM.value,d=dD.value,y=dY.value;
+    if(!m||!d||y.length<4){dMsg.textContent="";return""}
+    const mm=+m,dd=+d,yy=+y,dt=new Date(yy,mm-1,dd);
+    if(!(mm>=1&&mm<=12)||dt.getMonth()!==mm-1||dt.getDate()!==dd){dMsg.textContent="That date doesn't exist. Check the month and day.";return""}
+    const age=(Date.now()-dt)/31557600000;
+    if(age<3||age>14){dMsg.textContent="Check the year. This student would be "+Math.max(0,Math.floor(age))+" years old.";return""}
+    dMsg.textContent="";return `${yy}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
+  };
+  const ok=()=>go.disabled=!(fn.value.trim()&&ln.value.trim()&&readDob()&&(c1.checked||c2.checked));
+  [fn,ln].forEach(e=>{e.oninput=ok});c1.onchange=ok;c2.onchange=ok;
+  /* digits only, jump to the next box when full */
+  [[dM,dD],[dD,dY],[dY,null]].forEach(([el,nx])=>{el.oninput=()=>{el.value=el.value.replace(/\D/g,"");if(nx&&el.value.length===el.maxLength)nx.focus();ok()}});
   go.onclick=()=>{
     plan=[];if(c1.checked)plan.push("sb");if(c2.checked)plan.push("pd");
     const f=fn.value.trim(),l=ln.value.trim();
-    session={id:Date.now().toString(36),first:f,last:l,name:f+" "+l,dob:db.value,date:today,device:getDevice(),
+    session={id:Date.now().toString(36),first:f,last:l,name:f+" "+l,dob:readDob(),date:today,device:getDevice(),
       start:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),results:[],status:{}};
     step=0;beginTask();
   };
