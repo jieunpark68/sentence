@@ -80,6 +80,8 @@ th{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
 .pieceWrap .chunk,.pieceWrap .choice{border-top-right-radius:0;border-bottom-right-radius:0;border-right-width:0}
 .spk{font-size:18px;min-width:44px;padding:0 8px;border:3px solid var(--chipbd);border-left:2px dashed var(--line);background:var(--bg);border-radius:0 12px 12px 0;cursor:pointer}
 .spk:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
+.qpic{margin:0;display:flex;justify-content:center}
+.qpic img{width:100%;max-width:520px;aspect-ratio:3/2;object-fit:cover;border-radius:16px;border:2px solid var(--line);background:var(--bg)}
 .qrow{display:flex;align-items:flex-start;gap:12px}
 .dirRow{display:flex;align-items:center;gap:12px}
 .dirRow .script{flex:1;min-width:0}
@@ -142,24 +144,24 @@ const SB_TEST=[
 /* ================= PART 2: PRONOUN DETECTIVE =================
    Choices are shown in the fixed order listed. */
 const PD_PRACTICE=[
-  {q:"Lily has a red notepad. ___ writes in it every day.",choices:["Her","She","It"],answer:"She"},
-  {q:"The dogs barked. ___ were very loud.",choices:["They","Them","It"],answer:"They"}
+  {q:"Nora lost her phone. ___ looked everywhere.",choices:["Her","She","It"],answer:"She",img:"pdP1.jpg"},
+  {q:"The cub jumped in the pool. ___ splashed the water.",choices:["They","It","Them"],answer:"It",img:"pdP2.jpg"}
 ];
 const PD_TEST=[
-  {q:"Lily found paw prints. ___ took a picture.",choices:["Her","She","He"],answer:"She"},
-  {q:"Dad saw trash behind the store. ___ called Officer Kim.",choices:["He","Him","She"],answer:"He"},
-  {q:"The cub was hungry. ___ ate the berries.",choices:["They","It","Him"],answer:"It"},
-  {q:"Mom made hot enchiladas. ___ put them on the table.",choices:["She","Her","They"],answer:"She"},
-  {q:"Nora and I looked over the fence. ___ saw the bear.",choices:["Us","They","We"],answer:"We"},
-  {q:"Lily and Nora followed the paw prints. ___ walked to the forest.",choices:["Them","They","She"],answer:"They"},
-  {q:"Officer Ross is a wildlife officer. ___ caught the cub.",choices:["Him","It","He"],answer:"He"},
-  {q:"The gate was broken. ___ had scratch marks.",choices:["It","They","Them"],answer:"It"},
-  {q:"Nora looked at Lily. \u201C___ are a good helper!\u201D she said.",choices:["Your","You","We"],answer:"You"},
-  {q:"The bear cubs found a pool. ___ splashed in the water.",choices:["It","Them","They"],answer:"They"},
-  {q:"Dad and I fixed the bird feeder. ___ worked all morning.",choices:["We","Us","They"],answer:"We"},
-  {q:"The bear ran away. ___ went back to the forest.",choices:["It","They","Its"],answer:"It"},
-  {q:"Mom and Dad looked outside. ___ saw the bear cub.",choices:["Them","We","They"],answer:"They"},
-  {q:"\u201CCan ___ help me find the cub?\u201D Lily asked Nora.",choices:["your","you","she"],answer:"you"}
+  {q:"Lily walked into the forest. ___ had a backpack.",choices:["Her","She","He"],answer:"She",img:"pd01.jpg"},
+  {q:"Grandpa found black fur. ___ held it up.",choices:["He","Him","She"],answer:"He",img:"pd02.jpg"},
+  {q:"The cub was small. ___ stood by the fire hydrant.",choices:["They","It","Him"],answer:"It",img:"pd03.jpg"},
+  {q:"Officer Kim gave the girls badges. ___ smiled at them.",choices:["She","Her","They"],answer:"She",img:"pd04.jpg"},
+  {q:"Nora and I looked over the fence. ___ saw the bear.",choices:["Us","They","We"],answer:"We",img:"pd05.jpg"},
+  {q:"Lily and Nora jumped up and down. ___ were so happy.",choices:["Them","They","She"],answer:"They",img:"pd06.jpg"},
+  {q:"Officer Ross ran down the street. ___ was very fast.",choices:["Him","It","He"],answer:"He",img:"pd07.jpg"},
+  {q:"The bird feeder was bent. ___ hung on a crooked pole.",choices:["It","They","Them"],answer:"It",img:"pd08.jpg"},
+  {q:"Nora looked at Lily. \u201C___ eat so fast!\u201D she said.",choices:["Your","You","We"],answer:"You",img:"pd09.jpg"},
+  {q:"Sam and Max were mad. ___ crossed their arms.",choices:["It","Them","They"],answer:"They",img:"pd10.jpg"},
+  {q:"Nora and I rode our bikes. ___ had to be home by 7.",choices:["We","Us","They"],answer:"We",img:"pd11.jpg"},
+  {q:"The bear walked in the forest. ___ was very big.",choices:["It","They","Its"],answer:"It",img:"pd12.jpg"},
+  {q:"The berries were on the bush. ___ were dark blue.",choices:["Them","We","They"],answer:"They",img:"pd13.jpg"},
+  {q:"Lily looked at Nora. \u201C___ are my best friend,\u201D she said.",choices:["your","you","she"],answer:"you",img:"pd14.jpg"}
 ];
 
 const TASKS={
@@ -268,6 +270,10 @@ function setup(){
       <span>${saved.length} student${saved.length===1?"":"s"} saved on this iPad</span>
       <button class="btn small" id="eodBtn">End of the day</button>
     </div>
+    <div class="examiner">
+      <span>Voice: <strong id="voiceName">${esc(voiceLabel())}</strong></span>
+      <button class="btn small" id="testVoice">🔊 Test voice</button>
+    </div>
   </section>`;
   const fn=$("#fname"),ln=$("#lname"),go=$("#begin"),c1=$("#doSB"),c2=$("#doPD");
   const dM=$("#dobM"),dD=$("#dobD"),dY=$("#dobY"),dMsg=$("#dobMsg");
@@ -288,12 +294,13 @@ function setup(){
   go.onclick=()=>{
     plan=[];if(c1.checked)plan.push("sb");if(c2.checked)plan.push("pd");
     const f=fn.value.trim(),l=ln.value.trim();
-    session={id:Date.now().toString(36),first:f,last:l,name:f+" "+l,dob:readDob(),date:today,device:getDevice(),
+    session={id:Date.now().toString(36),first:f,last:l,name:f+" "+l,dob:readDob(),date:today,device:getDevice(),voice:voiceLabel(),
       start:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),results:[],status:{}};
     step=0;beginTask();
   };
   const dev=$("#device");dev.oninput=()=>setDevice(dev.value.trim());
   on("eodBtn",showEndOfDay);
+  on("testVoice",()=>speak("Hi! These pieces are parts of a sentence. Lily found paw prints in the sandbox."));
   fn.focus();
 }
 
@@ -305,6 +312,7 @@ function dirHTML(text){
 function wireScript(){on("readScript",()=>speak($("#scriptText").textContent))}
 /* ================= FLOW ================= */
 function beginTask(){
+  [...PD_PRACTICE,...PD_TEST].forEach(it=>{if(it.img){const im=new Image();im.src=it.img}});
   if(step>=plan.length){finish();return}
   task=plan[step];phase="practice";i=0;
   titleEl.textContent=TASKS[task].title;tag.hidden=false;tag.textContent="Practice";tag.className="tag practice";
@@ -349,7 +357,8 @@ function render(fb,fbc){
   const body=task==="sb"
     ?`<div><p class="label">My sentence</p><div class="lineArea ${line.length?"":"empty"}" id="lineArea"></div></div>
       <div><p class="label">Pieces</p><div class="tray ${tray.length?"":"empty"}" id="tray"></div></div>`
-    :`<div class="qrow"><button class="spk spkBig" id="readQ" aria-label="Read the sentence">🔊</button><p class="sentenceQ">${fillBlank(it.q)}</p></div>
+    :`${it.img?`<figure class="qpic"><img src="${it.img}" alt="" onerror="this.parentNode.hidden=true"></figure>`:""}
+      <div class="qrow"><button class="spk spkBig" id="readQ" aria-label="Read the sentence">🔊</button><p class="sentenceQ">${fillBlank(it.q)}</p></div>
       <p class="note">Tap any word to hear it.</p>
       <div class="choices" id="choices">${it.choices.map((c,k)=>`<span class="pieceWrap"><button class="choice" id="ch${k}" aria-pressed="${pick===k}">${esc(c)}</button><button class="spk" id="sp${k}" aria-label="Hear ${esc(c)}">🔊</button></span>`).join("")}</div>`;
   scr.innerHTML=`<section class="card">
@@ -490,13 +499,13 @@ function ageMonths(dob,date){const a=new Date(dob),b=new Date(date);if(isNaN(a)|
 
 /* ================= CSV ================= */
 function toCSV(sessions){
-  const head=["first_name","last_name","dob","age_months","test_date","start_time","ipad","task","task_status","item","level","level_name","prompt","target","response","response_order","correct","time_sec","taps","listens","task_total_correct"];
+  const head=["first_name","last_name","dob","age_months","test_date","start_time","ipad","task","task_status","item","level","level_name","prompt","target","response","response_order","correct","time_sec","taps","listens","task_total_correct","voice"];
   const q=v=>{v=String(v??"");return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const out=[head.join(",")];
   sessions.forEach(s=>{
     const st=s.status||{}, tot=k=>s.results.filter(x=>(x.task||"sb")===k).reduce((a,x)=>a+x.correct,0);
     s.results.forEach(x=>{const k=x.task||"sb";
-      out.push([...nameParts(s),s.dob,ageMonths(s.dob,s.date),s.date,s.start,s.device||"",TASKS[k].csvName,st[k]||s.ended||"",x.item,x.level,x.levelName,x.prompt||"",x.target,x.response,x.responseOrder,x.correct,x.timeSec,x.taps,x.listens??"",tot(k)].map(q).join(","))});
+      out.push([...nameParts(s),s.dob,ageMonths(s.dob,s.date),s.date,s.start,s.device||"",TASKS[k].csvName,st[k]||s.ended||"",x.item,x.level,x.levelName,x.prompt||"",x.target,x.response,x.responseOrder,x.correct,x.timeSec,x.taps,x.listens??"",tot(k),s.voice||""].map(q).join(","))});
   });
   return "﻿"+out.join("\r\n");
 }
@@ -513,7 +522,38 @@ async function download(text,name){
     return"downloaded";
   }catch(e){return"failed"}
 }
-function speak(t){try{const s=window.speechSynthesis;if(!s)return;s.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.85;u.lang="en-US";s.speak(u)}catch(e){}}
+/* ---------- Voice: use the most natural English voice installed on this device ----------
+   iPad "Premium" and "Enhanced" voices sound far more natural than the default.
+   Preference: Premium > Enhanced > known natural US voices > Google/Microsoft neural > any en-US. */
+const PREFERRED=["Ava","Samantha","Allison","Susan","Zoe","Nicky","Evan","Tom","Joelle","Noelle"];
+let VOICE=null;
+function scoreVoice(v){
+  if(!/^en[-_]?/i.test(v.lang))return -1;
+  let s=0;const n=v.name;
+  if(/premium/i.test(n))s+=100;
+  if(/enhanced/i.test(n))s+=80;
+  if(/natural|neural|online/i.test(n))s+=70;          // Edge / Windows neural voices
+  if(/google us english/i.test(n))s+=60;               // Chrome
+  const k=PREFERRED.findIndex(p=>n.startsWith(p));if(k>=0)s+=40-k;
+  if(/en[-_]US/i.test(v.lang))s+=10;
+  if(/compact|novelty|albert|bad news|bells|boing|bubbles|cellos|jester|organ|superstar|trinoids|whisper|wobble|zarvox|good news|bahh/i.test(n))s-=200;
+  return s;
+}
+function pickVoice(){
+  try{const vs=speechSynthesis.getVoices();if(!vs.length)return;
+    VOICE=vs.slice().sort((a,b)=>scoreVoice(b)-scoreVoice(a))[0]||null;
+    const el=document.getElementById("voiceName");if(el)el.textContent=voiceLabel();
+  }catch(e){}
+}
+function voiceLabel(){
+  if(!VOICE)return"Default voice";
+  const q=/premium/i.test(VOICE.name)?"natural":/enhanced/i.test(VOICE.name)?"good":"basic";
+  return `${VOICE.name} (${q})`;
+}
+try{pickVoice();speechSynthesis.addEventListener("voiceschanged",pickVoice)}catch(e){}
+function speak(t){try{const s=window.speechSynthesis;if(!s)return;s.cancel();const u=new SpeechSynthesisUtterance(t);
+  if(!VOICE)pickVoice();if(VOICE){u.voice=VOICE;u.lang=VOICE.lang}else u.lang="en-US";
+  u.rate=.9;u.pitch=1;s.speak(u)}catch(e){}}
 
 setup();
 </script>
