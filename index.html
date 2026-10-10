@@ -73,6 +73,20 @@ th{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
 .choice[aria-pressed="true"]{border-color:var(--navy);background:var(--navy);color:#fff}
 .choice.hint{box-shadow:0 0 0 4px var(--sea)}
 .choice:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
+.choicesNext{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.bigchoice{min-height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:22px}
+.bigchoice small{font-family:var(--read);font-weight:400;font-size:15px;opacity:.9}
+.pieceWrap{display:inline-flex;align-items:stretch}
+.pieceWrap .chunk,.pieceWrap .choice{border-top-right-radius:0;border-bottom-right-radius:0;border-right-width:0}
+.spk{font-size:18px;min-width:44px;padding:0 8px;border:3px solid var(--chipbd);border-left:2px dashed var(--line);background:var(--bg);border-radius:0 12px 12px 0;cursor:pointer}
+.spk:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
+.qrow{display:flex;align-items:flex-start;gap:12px}
+.dirRow{display:flex;align-items:center;gap:12px}
+.dirRow .script{flex:1;min-width:0}
+.dirLine{margin:0;font-size:19px;font-weight:700;color:var(--navy)}
+.spkBig{font-size:28px;min-width:64px;min-height:64px;border-radius:16px;border:3px solid var(--navy);flex:none}
+.sentenceQ .w{cursor:pointer;border-radius:6px}
+.sentenceQ .w:active,.sentenceQ .w:focus-visible{background:var(--sea);outline:none}
 .dob{display:flex;align-items:center;gap:8px}
 .dob input{font-family:var(--read);font-size:22px;width:3.4em;text-align:center;padding:10px 6px;border:2px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)}
 .dob input.yr{width:4.6em}
@@ -156,7 +170,7 @@ const TASKS={
 /* ================= STATE ================= */
 let session=null, plan=[], step=0;   // plan: list of task keys to run
 let task="sb", phase="setup", i=0;    // phase: practice | test
-let line=[], tray=[], pick=null, t0=0, taps=0, solved=false;
+let line=[], tray=[], pick=null, t0=0, taps=0, listens=0, solved=false;
 const scr=document.getElementById("screen"), tag=document.getElementById("modeTag"), titleEl=document.getElementById("title");
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -177,17 +191,43 @@ function setDevice(v){try{localStorage.setItem("ss-device",v)}catch(e){}}
 function savedDates(list){const d=[...new Set(list.map(s=>s.date))].sort();return d.length===1?d[0]:d[0]+" to "+d[d.length-1]}
 function saveAll(){
   const dev=getDevice().replace(/[^A-Za-z0-9]+/g,""), n=backups().length;
-  saveWithStatus(toCSV(backups()),`SentenceSense_${dev?"iPad"+dev+"_":""}${localDate()}.csv`,`all ${n} student${n===1?"":"s"}`);
+  saveWithStatus(toCSV(backups()),`SentenceSense_${dev?"iPad"+dev+"_":""}${localDate()}.csv`,`all ${n} student${n===1?"":"s"}`,"eodMsg")
+    .then(r=>{if(r==="shared"||r==="downloaded"){const a=document.getElementById("afterSave"),c=document.getElementById("clrMsg");if(a)a.hidden=false;if(c)c.hidden=false}});
 }
-/* Runs a save and reports the outcome in #saveMsg. */
-async function saveWithStatus(text,name,what){
-  const el=document.getElementById("saveMsg"), say=(m,c)=>{if(el){el.textContent=m;el.className="feedback "+c}};
+/* ---------- End of the day: its own page, for the examiner only ---------- */
+function showEndOfDay(){
+  phase="eod";tag.hidden=false;tag.textContent="Examiner";tag.className="tag";titleEl.textContent="End of the Day";
+  const saved=backups();
+  scr.innerHTML=`<section class="card">
+    <h2>Save today's results</h2>
+    <p class="note"><strong>${saved.length}</strong> student${saved.length===1?"":"s"} saved on this iPad${saved.length?` (${esc(savedDates(saved))})`:""}${getDevice()?` · iPad ${esc(getDevice())}`:""}.</p>
+    ${saved.length?`<div class="tablewrap"><table><thead><tr><th>Student</th><th>Date</th></tr></thead><tbody>${saved.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.date)}</td></tr>`).join("")}</tbody></table></div>`:""}
+    <ol class="note" style="margin:0;padding-left:20px;font-size:16px">
+      <li>Tap <strong>Save all results</strong>, then choose OneDrive (or Save to Files).</li>
+      <li>Check that the file is in OneDrive.</li>
+      <li>Come back and tap <strong>Clear saved sessions</strong> so tomorrow starts fresh.</li>
+    </ol>
+    <div class="actions"><button class="btn primary" id="dlAll" ${saved.length?"":"disabled"}>Save all results (CSV)</button></div>
+    <p class="feedback" id="eodMsg"></p>
+    <div class="actions" id="afterSave" hidden><button class="btn" id="clr">Clear saved sessions</button></div>
+    <p class="note" id="clrMsg" hidden>Only clear after the file is in OneDrive. Clearing cannot be undone.</p>
+  </section>
+  <div class="actions" style="margin-top:14px"><button class="btn" id="back">← Back to start</button></div>`;
+  on("dlAll",saveAll);
+  let armed=false;
+  on("clr",()=>{if(!armed){armed=true;$("#clrMsg").textContent="Tap Clear again to delete all saved sessions from this iPad.";$("#clr").textContent="Yes, clear them";return}clearBackups();setup()});
+  on("back",setup);
+}
+/* Runs a save and reports the outcome in the given message line. */
+async function saveWithStatus(text,name,what,msgId="saveMsg"){
+  const el=document.getElementById(msgId), say=(m,c)=>{if(el){el.textContent=m;el.className="feedback "+c}};
   say("Saving…","try");
   const r=await download(text,name);
   if(r==="shared")say(`✓ File for ${what} sent. Check that it shows up in OneDrive or Files.`,"good");
   else if(r==="downloaded")say(`✓ File for ${what} downloaded (${name}). Check your Downloads folder.`,"good");
   else if(r==="cancelled")say(`✗ Not saved. The share menu was closed. Tap the button again and pick OneDrive or Save to Files.`,"try");
   else say(`✗ The file could not be saved. Try again.`,"try");
+  return r;
 }
 function localDate(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
 
@@ -221,19 +261,13 @@ function setup(){
     </div>
     <p class="note">Each part starts with 2 practice items. Sentence Builder has 20 test items and Pronoun Detective has 14.</p>
     <div class="actions"><button class="btn primary" id="begin" disabled>Start</button></div>
-  </section>
-  <section class="card" style="margin-top:18px">
-    <h2>End of the day</h2>
-    <div class="row">
-      <div class="field"><label for="device">iPad number</label><input id="device" autocomplete="off" maxlength="10" value="${esc(getDevice())}" placeholder="e.g. 7"></div>
+    <div class="examiner">
+      <label for="device">iPad number</label>
+      <input id="device" autocomplete="off" maxlength="10" value="${esc(getDevice())}" placeholder="e.g. 7" style="width:5em;font-size:16px;padding:6px 8px;border:2px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)">
+      <span class="spacer"></span>
+      <span>${saved.length} student${saved.length===1?"":"s"} saved on this iPad</span>
+      <button class="btn small" id="eodBtn">End of the day</button>
     </div>
-    <p class="note"><strong>${saved.length}</strong> student${saved.length===1?"":"s"} saved on this iPad${saved.length?` (${esc(savedDates(saved))})`:""}. Results are kept automatically after each student.</p>
-    <div class="actions">
-      <button class="btn primary" id="dlAll" ${saved.length?"":"disabled"}>Save all results (CSV)</button>
-      <button class="btn" id="clr" ${saved.length?"":"disabled"}>Clear saved sessions</button>
-    </div>
-    <p class="feedback" id="saveMsg"></p>
-    <p class="note" id="clrMsg">After the file is in OneDrive, tap Clear so tomorrow's file starts fresh.</p>
   </section>`;
   const fn=$("#fname"),ln=$("#lname"),go=$("#begin"),c1=$("#doSB"),c2=$("#doPD");
   const dM=$("#dobM"),dD=$("#dobD"),dY=$("#dobY"),dMsg=$("#dobMsg");
@@ -259,47 +293,51 @@ function setup(){
     step=0;beginTask();
   };
   const dev=$("#device");dev.oninput=()=>setDevice(dev.value.trim());
-  on("dlAll",saveAll);
-  let armed=false;
-  on("clr",()=>{if(!armed){armed=true;$("#clrMsg").textContent="Press Clear again to delete all saved sessions from this device. Make sure they are saved to OneDrive first.";return}clearBackups();setup()});
+  on("eodBtn",showEndOfDay);
   fn.focus();
 }
 
+/* Directions box: the GA can read it aloud, or tap the speaker to play it. */
+function dirHTML(text){
+  return `<p class="note">Read to the student, or tap the speaker to play it:</p>
+    <div class="dirRow"><button class="spk spkBig" id="readScript" aria-label="Hear the directions">🔊</button><p class="script" id="scriptText">${text}</p></div>`;
+}
+function wireScript(){on("readScript",()=>speak($("#scriptText").textContent))}
 /* ================= FLOW ================= */
 function beginTask(){
   if(step>=plan.length){finish();return}
   task=plan[step];phase="practice";i=0;
   titleEl.textContent=TASKS[task].title;tag.hidden=false;tag.textContent="Practice";tag.className="tag practice";
   const script=task==="sb"
-    ?`Hi, ${first()}! These pieces are parts of a sentence, but they are all mixed up. Tap the pieces to put them in the right order. Start with who or what the sentence is about. When you are done, tap Check.`
-    :`Now we are going to be pronoun detectives! Each sentence has a missing word. Read the sentence and tap the word that fits in the blank. When you are done, tap Check.`;
+    ?`Hi, ${first()}! These pieces are parts of a sentence, but they are all mixed up. Tap the pieces to put them in the right order. Start with who or what the sentence is about. If you want to hear a piece, tap the speaker next to it. When you are done, tap Check.`
+    :`Now we are going to be pronoun detectives! Each sentence has a missing word. Read the sentence and tap the word that fits in the blank. You can tap the big speaker to hear the sentence, or tap any word to hear it. When you are done, tap Check.`;
   scr.innerHTML=`<section class="card">
     <h2>${step===0?"Let's practice!":"Part 2: Let's practice!"}</h2>
-    <p class="script">Read to the student: ${script}</p>
+    ${dirHTML(script)}
     <div class="actions"><button class="btn go" id="go">Start practice</button></div></section>`;
-  on("go",loadItem);
+  on("go",loadItem);wireScript();
 }
 function testIntro(){
   phase="test";i=0;tag.textContent="Test";tag.className="tag";
   scr.innerHTML=`<section class="card">
     <h2>Great practicing!</h2>
-    <p class="script">Read to the student: Now it's your turn to do it all by yourself. I can't help you this time. ${task==="sb"?"Put the pieces in order, then tap Done.":"Tap the word that fits, then tap Done."} Some will be easy and some will be tricky. Just do your best!</p>
+    ${dirHTML(`Now it's your turn to do it all by yourself. I can't help you this time. ${task==="sb"?"Put the pieces in order, then tap Done.":"Tap the word that fits, then tap Done."} You can still tap the speakers to hear the words. Some will be easy and some will be tricky. Just do your best!`)}
     <div class="actions"><button class="btn primary" id="go">Start test</button></div></section>`;
-  on("go",loadItem);
+  on("go",loadItem);wireScript();
 }
 function endTask(how){
   session.status[task]=how;step++;
   if(step<plan.length){
     tag.hidden=true;
     scr.innerHTML=`<section class="card"><h2>Great job! Time for a short break.</h2>
-      <p class="script">Read to the student: You finished the first part! Next, we are going to be pronoun detectives.</p>
+      ${dirHTML("You finished the first part! Next, we are going to be pronoun detectives.")}
       <div class="actions"><button class="btn primary" id="go">Go to Part 2</button></div></section>`;
-    on("go",beginTask);
+    on("go",beginTask);wireScript();
   }else finish();
 }
 const items=()=>task==="sb"?(phase==="practice"?SB_PRACTICE:SB_TEST):(phase==="practice"?PD_PRACTICE:PD_TEST);
 function loadItem(){
-  const it=items()[i];line=[];tray=task==="sb"?it.order.slice():[];pick=null;taps=0;solved=false;t0=performance.now();
+  const it=items()[i];line=[];tray=task==="sb"?it.order.slice():[];pick=null;taps=0;listens=0;solved=false;t0=performance.now();
   render();
 }
 function nextItem(){if(i<items().length-1){i++;loadItem()}else if(phase==="practice")testIntro();else endTask("completed")}
@@ -311,10 +349,12 @@ function render(fb,fbc){
   const body=task==="sb"
     ?`<div><p class="label">My sentence</p><div class="lineArea ${line.length?"":"empty"}" id="lineArea"></div></div>
       <div><p class="label">Pieces</p><div class="tray ${tray.length?"":"empty"}" id="tray"></div></div>`
-    :`<p class="sentenceQ">${fillBlank(it.q)}</p>
-      <div class="choices" id="choices">${it.choices.map((c,k)=>`<button class="choice" id="ch${k}" aria-pressed="${pick===k}">${esc(c)}</button>`).join("")}</div>`;
+    :`<div class="qrow"><button class="spk spkBig" id="readQ" aria-label="Read the sentence">🔊</button><p class="sentenceQ">${fillBlank(it.q)}</p></div>
+      <p class="note">Tap any word to hear it.</p>
+      <div class="choices" id="choices">${it.choices.map((c,k)=>`<span class="pieceWrap"><button class="choice" id="ch${k}" aria-pressed="${pick===k}">${esc(c)}</button><button class="spk" id="sp${k}" aria-label="Hear ${esc(c)}">🔊</button></span>`).join("")}</div>`;
   scr.innerHTML=`<section class="card">
     <div class="meta"><span class="count">${P?"Practice":(task==="sb"?"Sentence":"Question")} ${i+1} of ${total}</span></div>
+    <div class="dirRow"><button class="spk spkBig" id="readDir" aria-label="Hear the directions">🔊</button><p class="dirLine">${task==="sb"?"Put the pieces in order to make a sentence. Then tap "+(P?"Check":"Done")+".":"Tap the word that fits in the blank. Then tap "+(P?"Check":"Done")+"."}</p></div>
     ${body}
     <p class="feedback ${fbc||""}" id="fb">${fb||""}</p>
     <div class="actions">
@@ -331,19 +371,38 @@ function render(fb,fbc){
     tray.forEach((k,pos)=>T.appendChild(chip(it.pieces[k],"tray"+pos,()=>{taps++;tray.splice(pos,1);line.push(k);render()})));
     on("clear",()=>{taps++;tray=tray.concat(line);line=[];render()});
   }else{
-    it.choices.forEach((_,k)=>on("ch"+k,()=>{if(solved)return;taps++;pick=k;render()}));
+    it.choices.forEach((c,k)=>{on("ch"+k,()=>{if(solved)return;taps++;pick=k;render()});on("sp"+k,()=>say(c))});
+    on("readQ",()=>say(it.q.replace("___","blank")));
+    scr.querySelectorAll(".w").forEach(w=>{w.onclick=()=>say(w.dataset.say);w.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();say(w.dataset.say)}}});
   }
   on("done",P?checkPractice:submit);
-  on("hear",()=>speak(task==="sb"?line.map(k=>it.pieces[k]).join(" "):readQ(it)));
+  on("hear",()=>say(task==="sb"?line.map(k=>it.pieces[k]).join(" "):readQ(it)));
   on("hint",hint);
   on("next",nextItem);
+  on("readDir",()=>speak($(".dirLine").textContent));
   let armed=false;
   on("stop",()=>{if(!armed){armed=true;$("#stopMsg").textContent="Press again to end this part and save.";return}endTask(`stopped at item ${i+1}`)});
 }
+/* Each word in the sentence is its own tap target that reads that word aloud. */
+function wordsHTML(text){
+  return text.split(/(\s+)/).map(t=>{
+    if(!t.trim())return t;
+    const clean=t.replace(/[^A-Za-z'’]/g,"");
+    return clean?`<span class="w" role="button" tabindex="0" data-say="${esc(clean)}">${esc(t)}</span>`:esc(t);
+  }).join("");
+}
 function fillBlank(q){const parts=q.split("___");const it=items()[i];const w=pick===null?"":it.choices[pick];
-  return esc(parts[0])+`<span class="blank ${pick===null?"empty":""}">${pick===null?"____":esc(w)}</span>`+esc(parts[1]||"")}
+  return wordsHTML(parts[0])+`<span class="blank w ${pick===null?"empty":""}" role="button" tabindex="0" data-say="${pick===null?"blank":esc(w)}">${pick===null?"____":esc(w)}</span>`+wordsHTML(parts[1]||"")}
 function readQ(it){return it.q.replace("___",pick===null?"blank":it.choices[pick])}
-function chip(text,id,fn){const b=document.createElement("button");b.className="chunk";b.id=id;b.textContent=text;b.onclick=fn;return b}
+/* A piece = tap to move + its own speaker button to hear it. */
+function chip(text,id,fn){
+  const wrap=document.createElement("span");wrap.className="pieceWrap";
+  const b=document.createElement("button");b.className="chunk";b.id=id;b.textContent=text;b.onclick=fn;
+  const s=document.createElement("button");s.className="spk";s.setAttribute("aria-label","Hear "+text);s.textContent="🔊";s.onclick=()=>say(text);
+  wrap.append(b,s);return wrap;
+}
+/* Read aloud and count it, so the CSV shows how often each student listened. */
+function say(t){listens++;speak(t)}
 function rightSoFar(){let ok=0;while(ok<line.length&&line[ok]===ok)ok++;return ok}
 
 /* ================= PRACTICE ================= */
@@ -377,11 +436,11 @@ function submit(){
   if(task==="sb"){
     session.results.push({task:"sb",item:i+1,level:it.lv,levelName:SB_LEVELS[it.lv-1],prompt:"",
       target:it.pieces.join(" "),response:line.map(k=>it.pieces[k]).join(" "),
-      responseOrder:line.map(k=>k+1).join("-"),correct:line.every((k,pos)=>k===pos)?1:0,timeSec:time,taps});
+      responseOrder:line.map(k=>k+1).join("-"),correct:line.every((k,pos)=>k===pos)?1:0,timeSec:time,taps,listens});
   }else{
     const resp=it.choices[pick];
     session.results.push({task:"pd",item:i+1,level:"",levelName:"",prompt:it.q,
-      target:it.answer,response:resp,responseOrder:String(pick+1),correct:resp===it.answer?1:0,timeSec:time,taps});
+      target:it.answer,response:resp,responseOrder:String(pick+1),correct:resp===it.answer?1:0,timeSec:time,taps,listens});
   }
   nextItem();
 }
@@ -411,26 +470,33 @@ function finish(){
       <span>${esc(session.name)} · DOB ${session.dob} · Age ${ageMonths(session.dob,session.date)} months · ${session.date}</span>
       <div class="tablewrap"><table><tbody>${rows}</tbody></table></div>
       ${kept
-        ?`<p class="feedback good">✓ Results saved on this iPad (${backups().length} student${backups().length===1?"":"s"} saved on this iPad so far). At the end of the day, tap Save all results on the start screen.</p>`
+        ?`<p class="feedback good">✓ Results saved on this iPad.</p>`
         :`<p class="feedback try">✗ Results were NOT saved on this iPad (Private Browsing or storage is off). Tap Save this student now before moving on.</p>`}
-      <div class="actions"><button class="btn primary" id="newS">Next student</button>${kept?`<button class="btn" id="saveAll">Save all results now</button>`:""}<button class="btn ${kept?"small":"primary"}" id="save">Save this student${kept?" only":""}</button></div>
       <p class="feedback" id="saveMsg"></p>
-    </div></section>`;
+    </div></section>
+    <section class="card" style="margin-top:18px">
+      <h2>Examiner: what's next?</h2>
+      <div class="choicesNext">
+        <button class="btn primary bigchoice" id="newS">Next student<small>Test another student on this iPad</small></button>
+        ${kept?`<button class="btn bigchoice" id="eodBtn">End of the day →<small>Done testing? Save today's results</small></button>`
+              :`<button class="btn go bigchoice" id="save">Save this student<small>Storage is off, so save now</small></button>`}
+      </div>
+    </section>`;
   on("save",()=>saveWithStatus(toCSV([session]),fname,"this student"));
-  on("saveAll",saveAll);
+  on("eodBtn",showEndOfDay);
   on("newS",setup);
 }
 function ageMonths(dob,date){const a=new Date(dob),b=new Date(date);if(isNaN(a)||isNaN(b))return"";let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());if(b.getDate()<a.getDate())m--;return m}
 
 /* ================= CSV ================= */
 function toCSV(sessions){
-  const head=["first_name","last_name","dob","age_months","test_date","start_time","ipad","task","task_status","item","level","level_name","prompt","target","response","response_order","correct","time_sec","taps","task_total_correct"];
+  const head=["first_name","last_name","dob","age_months","test_date","start_time","ipad","task","task_status","item","level","level_name","prompt","target","response","response_order","correct","time_sec","taps","listens","task_total_correct"];
   const q=v=>{v=String(v??"");return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const out=[head.join(",")];
   sessions.forEach(s=>{
     const st=s.status||{}, tot=k=>s.results.filter(x=>(x.task||"sb")===k).reduce((a,x)=>a+x.correct,0);
     s.results.forEach(x=>{const k=x.task||"sb";
-      out.push([...nameParts(s),s.dob,ageMonths(s.dob,s.date),s.date,s.start,s.device||"",TASKS[k].csvName,st[k]||s.ended||"",x.item,x.level,x.levelName,x.prompt||"",x.target,x.response,x.responseOrder,x.correct,x.timeSec,x.taps,tot(k)].map(q).join(","))});
+      out.push([...nameParts(s),s.dob,ageMonths(s.dob,s.date),s.date,s.start,s.device||"",TASKS[k].csvName,st[k]||s.ended||"",x.item,x.level,x.levelName,x.prompt||"",x.target,x.response,x.responseOrder,x.correct,x.timeSec,x.taps,x.listens??"",tot(k)].map(q).join(","))});
   });
   return "﻿"+out.join("\r\n");
 }
