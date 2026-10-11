@@ -144,28 +144,20 @@ const SB_TEST=[
 /* ================= PART 2: PRONOUN DETECTIVE =================
    Choices are shown in the fixed order listed. */
 const PD_PRACTICE=[
-  {q:"Nora lost her phone. ___ looked everywhere.",choices:["Her","She","It"],answer:"She",img:"pdP1.jpg"},
-  {q:"The cub jumped in the pool. ___ splashed the water.",choices:["They","It","Them"],answer:"It",img:"pdP2.jpg"}
+  {q:"The cub saw the cool water in the pool, so ___ jumped in and splashed.",choices:["They","It","He","We"],answer:"It",img:"pp1.jpg"},
+  {q:"Officer Ross saw the bear cub run down the street, so ___ ran after it.",choices:["She","They","He","It"],answer:"He",img:"pp2.jpg"}
 ];
 const PD_TEST=[
-  {q:"Lily walked into the forest. ___ had a backpack.",choices:["Her","She","He"],answer:"She",img:"pd01.jpg"},
-  {q:"Grandpa found black fur. ___ held it up.",choices:["He","Him","She"],answer:"He",img:"pd02.jpg"},
-  {q:"The cub was small. ___ stood by the fire hydrant.",choices:["They","It","Him"],answer:"It",img:"pd03.jpg"},
-  {q:"Officer Kim gave Lily a badge. ___ smiled at her.",choices:["She","Her","They"],answer:"She",img:"pd04.jpg"},
-  {q:"Nora and I looked over the fence. ___ saw the bear.",choices:["Us","They","We"],answer:"We",img:"pd05.jpg"},
-  {q:"Lily and Nora jumped up and down. ___ were so happy.",choices:["Them","They","She"],answer:"They",img:"pd06.jpg"},
-  {q:"Officer Ross ran down the street. ___ was very fast.",choices:["Him","It","He"],answer:"He",img:"pd07.jpg"},
-  {q:"The bird feeder was bent. ___ hung on a crooked pole.",choices:["It","They","Them"],answer:"It",img:"pd08.jpg"},
-  {q:"Nora looked at Lily. \u201C___ eat so fast!\u201D she said.",choices:["Your","You","We"],answer:"You",img:"pd09.jpg"},
-  {q:"Sam and Max were mad. ___ crossed their arms.",choices:["It","Them","They"],answer:"They",img:"pd10.jpg"},
-  {q:"Nora and I rode our bikes. ___ had to be home by 7.",choices:["We","Us","They"],answer:"We",img:"pd11.jpg"},
-  {q:"The bear walked in the forest. ___ was very big.",choices:["It","They","Its"],answer:"It",img:"pd12.jpg"},
-  {q:"The berries were on the bush. ___ were dark blue.",choices:["Them","We","They"],answer:"They",img:"pd13.jpg"},
-  {lv:2,q:"Lily and her friend got gold badges. \u201COfficer Kim gave the badges to ___!\u201D said Lily.",choices:["we","us","our"],answer:"us",img:"pd14.jpg"},
-  {lv:2,q:"\u201CCan you help ___ pull this out?\u201D asked Nora.",choices:["me","my","I"],answer:"me",img:"pd15.jpg"},
-  {lv:2,q:"Nora built a fort in her backyard. \u201CThis is ___ fort!\u201D she said.",choices:["I","me","my"],answer:"my",img:"pd16.jpg"},
-  {lv:2,q:"There were bags of trash behind the store. Dad picked ___ up.",choices:["them","they","their"],answer:"them",img:"pd17.jpg"},
-  {lv:2,q:"Lily saw paw prints in the sand. She took a picture of ___.",choices:["they","it","them"],answer:"them",img:"pd18.jpg"}
+  {q:"Dad told Lily to bring water on the hike, so ___ put a bottle in her backpack before walking into the forest.",choices:["He","She","They","It"],answer:"She",img:"pt01.jpg"},
+  {q:"When Grandpa and Lily walked down the trail, ___ found some black fur and picked it up with his hand.",choices:["She","We","They","He"],answer:"He",img:"pt02.jpg"},
+  {q:"Dad hung the new bird feeder on a tall pole, but now ___ is bent because the hungry bear pulled on it.",choices:["He","They","It","She"],answer:"It",img:"pt03.jpg"},
+  {q:"Sam and Max lost the game at recess, and ___ were too mad to talk to anyone.",choices:["They","He","We","It"],answer:"They",img:"pt04.jpg"},
+  {q:"Nora and I heard a loud noise in the yard, so ___ ran over and looked over the fence.",choices:["They","You","She","We"],answer:"We",img:"pt05.jpg"},
+  {q:"\u201CMy phone is missing!\u201D said Nora. \u201C___ looked under the couch, but it is not there.\u201D",choices:["I","She","We","You"],answer:"I",img:"pt06.jpg"},
+  {q:"Nora watched Lily eat cookies at the table. \u201C___ eat so fast, and I am still eating!\u201D she said.",choices:["I","You","We","She"],answer:"You",img:"pt07.jpg"},
+  {lv:2,q:"Lily held up her new badge. \u201COfficer Kim gave this badge to ___ because I helped find the cub!\u201D she said.",choices:["him","her","me","us"],answer:"me",img:"pt08.jpg"},
+  {lv:2,q:"Nora built a fort in her backyard with a big box and a blanket. \u201CThis is ___ fort, so please knock first!\u201D she said.",choices:["my","your","her","our"],answer:"my",img:"pt09.jpg"},
+  {lv:2,q:"The wind blew the trash bags all over the yard, so Dad walked outside and picked ___ up.",choices:["it","him","them","us"],answer:"them",img:"pt10.jpg"}
 ];
 const PD_LEVELS=["Subject pronouns","Object and possessive pronouns"];
 
@@ -263,10 +255,10 @@ function setup(){
     <div class="field"><label>Tasks to give</label>
       <div class="checks">
         <label for="doSB"><input type="checkbox" id="doSB" checked> Part 1: Sentence Builder (20)</label>
-        <label for="doPD"><input type="checkbox" id="doPD" checked> Part 2: Pronoun Detective (18)</label>
+        <label for="doPD"><input type="checkbox" id="doPD" checked> Part 2: Pronoun Detective (10)</label>
       </div>
     </div>
-    <p class="note">Each part starts with 2 practice items. Sentence Builder has 20 test items and Pronoun Detective has 18.</p>
+    <p class="note">Each part starts with 2 practice items. Sentence Builder has 20 test items and Pronoun Detective has 10.</p>
     <div class="actions"><button class="btn primary" id="begin" disabled>Start</button></div>
     <div class="examiner">
       <label for="device">iPad number</label>
