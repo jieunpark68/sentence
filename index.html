@@ -161,6 +161,14 @@ const PD_TEST=[
 ];
 const PD_LEVELS=["Subject pronouns","Object and possessive pronouns"];
 
+/* Capital letter only when the blank starts a sentence or a quote; "I" always stays capital. */
+function fixCase(arr){arr.forEach(it=>{
+  const before=it.q.split("___")[0];
+  const atStart=/^\s*$|[.!?]\s*$|[\u201C"]\s*$/.test(before);
+  const f=w=>w==="I"?w:(atStart?w[0].toUpperCase()+w.slice(1):w.toLowerCase());
+  it.choices=it.choices.map(f);it.answer=f(it.answer);
+})}
+fixCase(PD_PRACTICE);fixCase(PD_TEST);
 const TASKS={
   sb:{title:"Sentence Builder",csvName:"Sentence Builder"},
   pd:{title:"Pronoun Detective",csvName:"Pronoun Detective"}
