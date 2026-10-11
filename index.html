@@ -161,8 +161,13 @@ const PD_TEST=[
   {q:"Nora and I rode our bikes. ___ had to be home by 7.",choices:["We","Us","They"],answer:"We",img:"pd11.jpg"},
   {q:"The bear walked in the forest. ___ was very big.",choices:["It","They","Its"],answer:"It",img:"pd12.jpg"},
   {q:"The berries were on the bush. ___ were dark blue.",choices:["Them","We","They"],answer:"They",img:"pd13.jpg"},
-  {q:"Lily looked at Nora. \u201C___ are my best friend,\u201D she said.",choices:["your","you","she"],answer:"you",img:"pd14.jpg"}
+  {lv:2,q:"Lily and her friend got gold badges. \u201COfficer Kim gave the badges to ___!\u201D said Lily.",choices:["we","us","our"],answer:"us",img:"pd14.jpg"},
+  {lv:2,q:"\u201CCan you help ___ pull this out?\u201D asked Nora.",choices:["me","my","I"],answer:"me",img:"pd15.jpg"},
+  {lv:2,q:"Nora built a fort in her backyard. \u201CThis is ___ fort!\u201D she said.",choices:["I","me","my"],answer:"my",img:"pd16.jpg"},
+  {lv:2,q:"There were bags of trash behind the store. Dad picked ___ up.",choices:["them","they","their"],answer:"them",img:"pd17.jpg"},
+  {lv:2,q:"Lily saw paw prints in the sand. She took a picture of ___.",choices:["they","it","them"],answer:"them",img:"pd18.jpg"}
 ];
+const PD_LEVELS=["Subject pronouns","Object and possessive pronouns"];
 
 const TASKS={
   sb:{title:"Sentence Builder",csvName:"Sentence Builder"},
@@ -258,10 +263,10 @@ function setup(){
     <div class="field"><label>Tasks to give</label>
       <div class="checks">
         <label for="doSB"><input type="checkbox" id="doSB" checked> Part 1: Sentence Builder (20)</label>
-        <label for="doPD"><input type="checkbox" id="doPD" checked> Part 2: Pronoun Detective (14)</label>
+        <label for="doPD"><input type="checkbox" id="doPD" checked> Part 2: Pronoun Detective (18)</label>
       </div>
     </div>
-    <p class="note">Each part starts with 2 practice items. Sentence Builder has 20 test items and Pronoun Detective has 14.</p>
+    <p class="note">Each part starts with 2 practice items. Sentence Builder has 20 test items and Pronoun Detective has 18.</p>
     <div class="actions"><button class="btn primary" id="begin" disabled>Start</button></div>
     <div class="examiner">
       <label for="device">iPad number</label>
@@ -448,7 +453,7 @@ function submit(){
       responseOrder:line.map(k=>k+1).join("-"),correct:line.every((k,pos)=>k===pos)?1:0,timeSec:time,taps,listens});
   }else{
     const resp=it.choices[pick];
-    session.results.push({task:"pd",item:i+1,level:"",levelName:"",prompt:it.q,
+    session.results.push({task:"pd",item:i+1,level:it.lv||1,levelName:PD_LEVELS[(it.lv||1)-1],prompt:it.q,
       target:it.answer,response:resp,responseOrder:String(pick+1),correct:resp===it.answer?1:0,timeSec:time,taps,listens});
   }
   nextItem();
@@ -468,6 +473,7 @@ function finish(){
   if(plan.includes("pd")){
     const pd=r.filter(x=>x.task==="pd");
     rows+=`<tr><th colspan="2">Part 2: Pronoun Detective · ${esc(session.status.pd||"")}</th></tr>`;
+    rows+=PD_LEVELS.map((n,j)=>{const t=pd.filter(x=>x.level===j+1);return t.length?`<tr><td>${esc(n)}</td><td>${sum(t)} / ${t.length}</td></tr>`:""}).join("");
     rows+=`<tr><td><strong>Pronoun Detective total</strong></td><td><strong>${sum(pd)} / ${pd.length}</strong></td></tr>`;
   }
   const fname=`SentenceSense_${(session.last+"_"+session.first).replace(/[^A-Za-z0-9]+/g,"_")}_${session.date}.csv`;
