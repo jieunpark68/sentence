@@ -330,26 +330,48 @@ function beginTask(){
   scr.innerHTML=`<section class="card">
     <h2>${step===0?"Let's practice!":"Part 2: Let's practice!"}</h2>
     ${dirHTML(script)}
-    <div class="actions"><button class="btn go" id="go">Start practice</button></div></section>`;
-  on("go",loadItem);wireScript();
+    <div class="actions"><button class="btn go" id="go">Start practice</button><button class="btn" id="back">← Back</button></div></section>`;
+  on("go",loadItem);on("back",step===0?backToSetup:showBreak);wireScript();
 }
 function testIntro(){
   phase="test";i=0;tag.textContent="Test";tag.className="tag";
   scr.innerHTML=`<section class="card">
     <h2>Great practicing!</h2>
     ${dirHTML(`Now it's your turn to do it all by yourself. I can't help you this time. ${task==="sb"?"Put the pieces in order, then tap Done.":"Tap the word that fits, then tap Done."} You can still tap the speakers to hear the words. Some will be easy and some will be tricky. Just do your best!`)}
-    <div class="actions"><button class="btn primary" id="go">Start test</button></div></section>`;
-  on("go",loadItem);wireScript();
+    <div class="actions"><button class="btn primary" id="go">Start test</button><button class="btn" id="back">← Back</button></div></section>`;
+  on("go",loadItem);on("back",()=>{phase="practice";tag.textContent="Practice";tag.className="tag practice";i=items().length-1;loadItem()});wireScript();
 }
 function endTask(how){
   session.status[task]=how;step++;
-  if(step<plan.length){
-    tag.hidden=true;
-    scr.innerHTML=`<section class="card"><h2>Great job! Time for a short break.</h2>
-      ${dirHTML("You finished the first part! Next, we are going to be pronoun detectives.")}
-      <div class="actions"><button class="btn primary" id="go">Go to Part 2</button></div></section>`;
-    on("go",beginTask);wireScript();
-  }else finish();
+  if(step<plan.length)showBreak();else finish();
+}
+/* Back to student info, keeping what was typed */
+function backToSetup(){
+  const s0=session;setup();if(!s0)return;
+  const set=(id,v)=>{const e=document.getElementById(id);if(e){e.value=v||"";}};
+  set("fname",s0.first);set("lname",s0.last);
+  if(s0.dob){const [y,m,d]=s0.dob.split("-");set("dobM",m);set("dobD",d);set("dobY",y)}
+  document.getElementById("doSB").checked=plan.includes("sb");document.getElementById("doPD").checked=plan.includes("pd");
+  const e=document.getElementById("dobY");if(e&&e.oninput)e.oninput();
+}
+function showBreak(){
+  tag.hidden=true;
+  scr.innerHTML=`<section class="card"><h2>Great job! Time for a short break.</h2>
+    ${dirHTML("You finished the first part! Next, we are going to be pronoun detectives.")}
+    <div class="actions"><button class="btn primary" id="go">Go to Part 2</button><button class="btn" id="back">← Back</button></div></section>`;
+  on("go",beginTask);on("back",backToLastPart);wireScript();
+}
+/* Back from the break: return to the last test item of the part just finished. Its saved answer is removed so it can be redone. */
+function backToLastPart(){
+  step--;task=plan[step];delete session.status[task];phase="test";tag.hidden=false;tag.textContent="Test";tag.className="tag";titleEl.textContent=TASKS[task].title;
+  const done=session.results.filter(r=>r.task===task).length;
+  i=Math.min(done,items().length-1);dropResult(i);loadItem();
+}
+function dropResult(k){session.results=session.results.filter(r=>!(r.task===task&&r.item===k+1))}
+/* Back on an item screen */
+function goBack(){
+  if(phase==="practice"){if(i>0){i--;loadItem()}else beginTask()}
+  else{if(i>0){i--;dropResult(i);loadItem()}else{phase="practice";testIntro()}}
 }
 const items=()=>task==="sb"?(phase==="practice"?SB_PRACTICE:SB_TEST):(phase==="practice"?PD_PRACTICE:PD_TEST);
 function loadItem(){
@@ -379,6 +401,7 @@ function render(fb,fbc){
        :`<button class="btn primary" id="done" ${ready?"":"disabled"}>${P?"Check":"Done"}</button>
          ${task==="sb"?`<button class="btn" id="clear" ${line.length?"":"disabled"}>Start over</button>`:""}
          ${P?`<button class="btn" id="hear">🔊 Hear it</button><span class="spacer"></span><button class="btn" id="hint">Hint</button>`:""}`}
+      <button class="btn" id="goBack">← Back</button>
     </div>
     ${P?"":`<div class="examiner"><span>Examiner only:</span><button class="btn small" id="stop">End this part early</button><span id="stopMsg"></span></div>`}
   </section>`;
@@ -396,6 +419,7 @@ function render(fb,fbc){
   on("hear",()=>say(task==="sb"?(solved?fullSent(it):line.map(k=>it.pieces[k])):readQ(it)));
   on("hint",hint);
   on("next",nextItem);
+  on("goBack",goBack);
   on("readDir",()=>speak($(".dirLine").textContent));
   let armed=false;
   on("stop",()=>{if(!armed){armed=true;$("#stopMsg").textContent="Press again to end this part and save.";return}endTask(`stopped at item ${i+1}`)});
@@ -460,6 +484,8 @@ function submit(){
     session.results.push({task:"pd",item:i+1,level:it.lv||1,levelName:PD_LEVELS[(it.lv||1)-1],prompt:it.q,
       target:it.answer,response:resp,responseOrder:String(pick+1),correct:resp===it.answer?1:0,timeSec:time,taps,listens});
   }
+  /* keep rows in item order even if an item was redone with Back */
+  session.results.sort((a,b)=>(a.task===b.task?0:(a.task==="sb"?-1:1))||a.item-b.item);
   nextItem();
 }
 
